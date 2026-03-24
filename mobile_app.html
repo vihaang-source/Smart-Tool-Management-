@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0d0f10"/>
+<title>ToolVault</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:    #0d0f10;
+  --bg2:   #161a1d;
+  --bg3:   #1e2328;
+  --wire:  #2c333b;
+  --muted: #5c6672;
+  --text:  #cdd4db;
+  --hi:    #eef2f5;
+  --amber: #f5a623;
+  --green: #22c36e;
+  --red:   #e8403a;
+  --blue:  #3d9cf5;
+  --safe:  env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;overflow:hidden;}
+body{
+  font-family:'Barlow',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  display:flex;flex-direction:column;
+}
+
+/* ── Status bar padding for notch phones ── */
+.status-bar{
+  height:env(safe-area-inset-top,0px);
+  background:var(--bg2);
+}
+
+/* ── Top bar ── */
+.topbar{
+  background:var(--bg2);
+  border-bottom:2px solid var(--amber);
+  padding:0 18px;
+  height:54px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.app-logo{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:20px;font-weight:800;
+  color:var(--hi);letter-spacing:.5px;
+}
+.app-logo em{color:var(--amber);font-style:normal;}
+.topbar-right{
+  display:flex;align-items:center;gap:10px;
+}
+.live-pill{
+  display:flex;align-items:center;gap:5px;
+  background:rgba(34,195,110,.12);
+  border:1px solid rgba(34,195,110,.25);
+  padding:3px 9px;font-size:10px;
+  color:var(--green);
+  font-family:'JetBrains Mono',monospace;
+}
+.live-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--green);
+  animation:pulse 2s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Scrollable content ── */
+.content{
+  flex:1;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:16px 16px calc(70px + var(--safe));
+}
+
+/* ── Stats row ── */
+.stats-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:18px;
+}
+.stat-card{
+  background:var(--bg2);
+  border:1px solid var(--wire);
+  border-top:3px solid;
+  padding:14px;
+}
+.stat-card.c-amber{border-top-color:var(--amber);}
+.stat-card.c-green{border-top-color:var(--green);}
+.stat-card.c-red  {border-top-color:var(--red);}
+.stat-card.c-blue {border-top-color:var(--blue);}
+.scard-label{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:10px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;color:var(--muted);
+  margin-bottom:6px;
+}
+.scard-val{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:38px;font-weight:800;line-height:1;
+}
+.c-amber .scard-val{color:var(--amber);}
+.c-green .scard-val{color:var(--green);}
+.c-red   .scard-val{color:var(--red);}
+.c-blue  .scard-val{color:var(--blue);}
+
+/* ── Overdue alert ── */
+.overdue-bar{
+  background:rgba(232,64,58,.12);
+  border:1px solid rgba(232,64,58,.3);
+  border-left:4px solid var(--red);
+  padding:10px 14px;font-size:12px;color:var(--red);
+  margin-bottom:14px;
+}
+.overdue-bar.hidden{display:none;}
+
+/* ── Section header ── */
+.sec{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:11px;font-weight:700;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--amber);
+  margin:18px 0 10px;
+}
+
+/* ── Loan cards ── */
+.loan-card{
+  background:var(--bg2);
+  border:1px solid var(--wire);
+  border-left:3px solid var(--amber);
+  padding:13px 14px;
+  margin-bottom:8px;
+}
+.loan-card.overdue{
+  border-left-color:var(--red);
+  background:rgba(232,64,58,.06);
+}
+.lc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+.lc-name{font-size:14px;font-weight:600;color:var(--hi);}
+.lc-dur{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+}
+.lc-tool{font-size:12px;color:var(--muted);margin-bottom:4px;}
+.lc-time{font-size:11px;color:var(--muted);}
+.badge{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:10px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;padding:2px 7px;
+}
+.b-amber{background:rgba(245,166,35,.15);color:var(--amber);}
+.b-green{background:rgba(34,195,110,.15);color:var(--green);}
+.b-red  {background:rgba(232,64,58,.15); color:var(--red);}
+.b-blue {background:rgba(61,156,245,.15);color:var(--blue);}
+.b-muted{background:var(--bg3);          color:var(--muted);}
+
+/* ── History list ── */
+.hist-item{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 14px;
+  border-bottom:1px solid rgba(44,51,59,.6);
+  background:var(--bg2);
+}
+.hist-item:first-child{border-top:1px solid var(--wire);}
+.hist-dot{
+  width:8px;height:8px;border-radius:50%;
+  flex-shrink:0;
+}
+.dot-out{background:var(--amber);}
+.dot-in {background:var(--green);}
+.hist-body{flex:1;min-width:0;}
+.hist-main{font-size:13px;font-weight:500;color:var(--hi);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hist-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.hist-time{font-size:10px;color:var(--muted);flex-shrink:0;text-align:right;}
+
+/* ── Alert items ── */
+.alert-item{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:12px 14px;
+  background:rgba(232,64,58,.07);
+  border:1px solid rgba(232,64,58,.2);
+  border-left:3px solid var(--red);
+  margin-bottom:8px;
+}
+.alert-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.alert-body{flex:1;}
+.alert-type{font-size:12px;font-weight:600;color:var(--red);}
+.alert-detail{font-size:11px;color:var(--muted);margin-top:2px;}
+
+/* ── Empty ── */
+.empty{padding:30px;text-align:center;color:var(--muted);font-size:13px;}
+
+/* ── Search ── */
+.srch-wrap{position:relative;margin-bottom:12px;}
+.srch-wrap input{
+  width:100%;background:var(--bg2);border:1px solid var(--wire);
+  color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;
+  padding:10px 14px;outline:none;
+}
+.srch-wrap input:focus{border-color:var(--amber);}
+
+/* ── Tools list ── */
+.tool-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 14px;
+  background:var(--bg2);
+  border-bottom:1px solid rgba(44,51,59,.5);
+}
+.tool-row:first-child{border-top:1px solid var(--wire);}
+.tool-info{flex:1;}
+.tool-name{font-size:13px;font-weight:600;color:var(--hi);}
+.tool-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+
+/* ── Bottom nav ── */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  height:calc(60px + var(--safe));
+  padding-bottom:var(--safe);
+  background:var(--bg2);
+  border-top:1px solid var(--wire);
+  display:flex;
+  z-index:100;
+}
+.nav-item{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:4px;cursor:pointer;
+  color:var(--muted);
+  transition:color .15s;
+  position:relative;
+  border:none;background:transparent;
+  -webkit-tap-highlight-color:transparent;
+}
+.nav-item.active{color:var(--amber);}
+.nav-icon{font-size:20px;line-height:1;}
+.nav-label{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.5px;
+}
+.nav-pip{
+  position:absolute;top:8px;right:calc(50% - 16px);
+  width:16px;height:16px;border-radius:50%;
+  background:var(--red);color:#fff;
+  font-size:9px;font-weight:700;
+  display:grid;place-items:center;
+}
+
+/* ── Page transitions ── */
+.page{display:none;animation:fadeIn .2s ease;}
+.page.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<div class="status-bar"></div>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="app-logo">Tool<em>Vault</em></div>
+  <div class="topbar-right">
+    <div class="live-pill">
+      <div class="live-dot"></div>
+      <span id="m-status">Live</span>
+    </div>
+  </div>
+</div>
+
+<!-- Scrollable content -->
+<div class="content">
+
+  <!-- ═══ DASHBOARD PAGE ═══ -->
+  <div class="page active" id="page-home">
+    <div class="overdue-bar hidden" id="m-overdue-bar">
+      ⚑ <span id="m-overdue-text"></span>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card c-amber">
+        <div class="scard-label">Borrowed</div>
+        <div class="scard-val" id="m-borrowed">—</div>
+      </div>
+      <div class="stat-card c-green">
+        <div class="scard-label">Available</div>
+        <div class="scard-val" id="m-avail">—</div>
+      </div>
+      <div class="stat-card c-blue">
+        <div class="scard-label">Total</div>
+        <div class="scard-val" id="m-total">—</div>
+      </div>
+      <div class="stat-card c-red">
+        <div class="scard-label">Overdue</div>
+        <div class="scard-val" id="m-overdue">0</div>
+      </div>
+    </div>
+
+    <div class="sec">Active Loans</div>
+    <div id="m-loan-list"><div class="empty">Loading...</div></div>
+  </div>
+
+  <!-- ═══ TOOLS PAGE ═══ -->
+  <div class="page" id="page-tools">
+    <div class="sec">All Tools</div>
+    <div class="srch-wrap">
+      <input id="m-tool-srch" placeholder="Search tools..." oninput="renderMobileTools()"/>
+    </div>
+    <div id="m-tool-list"><div class="empty">Loading...</div></div>
+  </div>
+
+  <!-- ═══ HISTORY PAGE ═══ -->
+  <div class="page" id="page-hist">
+    <div class="sec">Transaction Log</div>
+    <div class="srch-wrap">
+      <input id="m-hist-srch" placeholder="Search history..." oninput="renderMobileHistory()"/>
+    </div>
+    <div id="m-hist-list"><div class="empty">Loading...</div></div>
+  </div>
+
+  <!-- ═══ ALERTS PAGE ═══ -->
+  <div class="page" id="page-alerts">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="sec" style="margin:0">System Alerts</div>
+      <button onclick="clearAlerts()" style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:5px 12px;background:var(--red);color:#fff;border:none;cursor:pointer;">Clear All</button>
+    </div>
+    <div id="m-alert-list"><div class="empty">No alerts</div></div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- Bottom nav -->
+<nav class="bottom-nav">
+  <button class="nav-item active" onclick="showPage('home',this)">
+    <div class="nav-icon">⊡</div>
+    <div class="nav-label">Dashboard</div>
+  </button>
+  <button class="nav-item" onclick="showPage('tools',this)">
+    <div class="nav-icon">⚙</div>
+    <div class="nav-label">Tools</div>
+  </button>
+  <button class="nav-item" onclick="showPage('hist',this)">
+    <div class="nav-icon">≡</div>
+    <div class="nav-label">History</div>
+  </button>
+  <button class="nav-item" onclick="showPage('alerts',this)" id="nav-alerts">
+    <div class="nav-icon">⚑</div>
+    <div class="nav-label">Alerts</div>
+    <div class="nav-pip" id="m-alert-pip" style="display:none">0</div>
+  </button>
+</nav>
+
+<script>
+// ════════════════════════════════════════════════════
+//  ★  PASTE YOUR FIREBASE CONFIG HERE (same as dashboard.html)  ★
+// ════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            "YOUR_WEB_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};
+// ════════════════════════════════════════════════════
+
+firebase.initializeApp(firebaseConfig);
+const db   = firebase.database();
+const auth = firebase.auth();
+
+const OVERDUE_HOURS = 8;
+let allTools = {}, allWorkers = {}, allLoans = {}, allHistory = {}, allAlerts = {};
+
+auth.signInAnonymously().catch(console.error);
+
+db.ref('/tools').on('value',    s => { allTools   = s.val()||{}; renderMobileTools(); updateMobileStats(); });
+db.ref('/workers').on('value',  s => { allWorkers = s.val()||{}; renderMobileLoans(); });
+db.ref('/activeLoans').on('value', s => { allLoans = s.val()||{}; renderMobileLoans(); updateMobileStats(); });
+db.ref('/history').on('value',  s => { allHistory = s.val()||{}; renderMobileHistory(); });
+db.ref('/alerts').on('value',   s => { allAlerts  = s.val()||{}; renderMobileAlerts(); });
+
+// ── Page navigation ──
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Duration helper ──
+function dur(since) {
+  if (!since) return '—';
+  try {
+    const mo = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const p = since.match(/(\d+)-(\w+)-(\d+) (\d+):(\d+):(\d+)/);
+    if (!p) return '—';
+    const d = new Date(+p[3],mo[p[2]],+p[1],+p[4],+p[5],+p[6]);
+    const m = Math.floor((Date.now()-d)/60000);
+    if (m < 60) return m+'m';
+    if (m < 1440) return Math.floor(m/60)+'h '+(m%60)+'m';
+    return Math.floor(m/1440)+'d '+Math.floor((m%1440)/60)+'h';
+  } catch { return '—'; }
+}
+function overdue(since) {
+  if (!since) return false;
+  try {
+    const mo = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const p = since.match(/(\d+)-(\w+)-(\d+) (\d+):(\d+):(\d+)/);
+    if (!p) return false;
+    const d = new Date(+p[3],mo[p[2]],+p[1],+p[4],+p[5],+p[6]);
+    return (Date.now()-d)/3600000 > OVERDUE_HOURS;
+  } catch { return false; }
+}
+
+// ── Stats ──
+function updateMobileStats() {
+  const arr = Object.values(allTools);
+  const b = arr.filter(t => t.status==='borrowed').length;
+  const a = arr.filter(t => t.status!=='borrowed').length;
+  let od = 0;
+  for (const wl of Object.values(allLoans))
+    for (const l of Object.values(wl))
+      if (overdue(l.checkedOut)) od++;
+
+  document.getElementById('m-borrowed').textContent = b;
+  document.getElementById('m-avail').textContent    = a;
+  document.getElementById('m-total').textContent    = arr.length;
+  document.getElementById('m-overdue').textContent  = od;
+
+  const bar = document.getElementById('m-overdue-bar');
+  if (od > 0) {
+    bar.classList.remove('hidden');
+    document.getElementById('m-overdue-text').textContent =
+      od + ' tool(s) overdue (>'+OVERDUE_HOURS+'h)';
+  } else {
+    bar.classList.add('hidden');
+  }
+}
+
+// ── Loans ──
+function renderMobileLoans() {
+  let h = '';
+  for (const [wUID, wLoans] of Object.entries(allLoans)) {
+    for (const [tUID, l] of Object.entries(wLoans)) {
+      const od = overdue(l.checkedOut);
+      const d  = dur(l.checkedOut);
+      h += `<div class="loan-card ${od?'overdue':''}">
+        <div class="lc-top">
+          <div class="lc-name">${esc(l.workerName||wUID)}</div>
+          <div class="lc-dur" style="color:${od?'var(--red)':'var(--amber)'}">${d}</div>
+        </div>
+        <div class="lc-tool">🔧 ${esc(l.toolName||tUID)}</div>
+        <div class="lc-time">${esc(l.checkedOut||'—')} ${od?'<span class="badge b-red">Overdue</span>':''}</div>
+      </div>`;
+    }
+  }
+  document.getElementById('m-loan-list').innerHTML =
+    h || '<div class="empty">✓ No tools currently borrowed</div>';
+}
+
+// ── Tools ──
+function renderMobileTools() {
+  const q = (document.getElementById('m-tool-srch')?.value||'').toLowerCase();
+  let h = '';
+  for (const [uid, t] of Object.entries(allTools)) {
+    if (q && !JSON.stringify(t).toLowerCase().includes(q)) continue;
+    const borrowed = t.status === 'borrowed';
+    const who = borrowed ? (allWorkers[t.borrowedBy]?.name||t.borrowedBy||'?') : '';
+    h += `<div class="tool-row">
+      <div class="tool-info">
+        <div class="tool-name">${esc(t.name||uid)}</div>
+        <div class="tool-meta">${esc(t.category||'—')} · ${esc(t.serialNumber||'—')}</div>
+        ${borrowed ? `<div class="tool-meta" style="color:var(--amber);margin-top:2px">With: ${esc(who)}</div>` : ''}
+      </div>
+      <div>${borrowed
+        ? '<span class="badge b-amber">Out</span>'
+        : '<span class="badge b-green">Free</span>'}</div>
+    </div>`;
+  }
+  document.getElementById('m-tool-list').innerHTML =
+    h || '<div class="empty">No tools registered</div>';
+}
+
+// ── History ──
+function renderMobileHistory() {
+  const q = (document.getElementById('m-hist-srch')?.value||'').toLowerCase();
+  const entries = Object.entries(allHistory).sort(([a],[b]) => b.localeCompare(a));
+  let h = '';
+  for (const [, ev] of entries) {
+    if (q && !JSON.stringify(ev).toLowerCase().includes(q)) continue;
+    const out = ev.type === 'CHECKOUT';
+    h += `<div class="hist-item">
+      <div class="hist-dot ${out?'dot-out':'dot-in'}"></div>
+      <div class="hist-body">
+        <div class="hist-main">${esc(ev.toolName||ev.toolUID||'—')}</div>
+        <div class="hist-sub">${out?'↑':'↓'} ${esc(ev.workerName||'—')}</div>
+      </div>
+      <div class="hist-time">${shortTime(ev.timestamp)}</div>
+    </div>`;
+  }
+  document.getElementById('m-hist-list').innerHTML =
+    h || '<div class="empty">No history yet</div>';
+}
+
+function shortTime(ts) {
+  if (!ts) return '—';
+  const parts = ts.split(' ');
+  return parts.length > 1 ? parts[0]+'<br>'+parts[1] : ts;
+}
+
+// ── Alerts ──
+function renderMobileAlerts() {
+  const entries = Object.entries(allAlerts).sort(([a],[b]) => b.localeCompare(a));
+  const pip = document.getElementById('m-alert-pip');
+  pip.textContent = entries.length;
+  pip.style.display = entries.length ? 'grid' : 'none';
+
+  let h = '';
+  for (const [, al] of entries) {
+    let type='', detail='';
+    if      (al.type==='UNKNOWN_ID')   { type='Unknown ID Card'; detail='UID: '+esc(al.uid||'—'); }
+    else if (al.type==='UNKNOWN_TOOL') { type='Unknown Tool Tag'; detail='Tag: '+esc(al.uid||'—'); }
+    else if (al.type==='CONFLICT')     { type='Tool Conflict'; detail='"'+esc(al.toolName)+'" already with '+esc(al.currentlyWithName); }
+    else                               { type=esc(al.type); detail='—'; }
+    h += `<div class="alert-item">
+      <div class="alert-icon">⚑</div>
+      <div class="alert-body">
+        <div class="alert-type">${type}</div>
+        <div class="alert-detail">${detail}</div>
+        <div class="alert-detail" style="margin-top:3px">${esc(al.timestamp||'—')}</div>
+      </div>
+    </div>`;
+  }
+  document.getElementById('m-alert-list').innerHTML =
+    h || '<div class="empty">✓ No alerts</div>';
+}
+
+function clearAlerts() {
+  if (!confirm('Clear all alerts?')) return;
+  db.ref('/alerts').remove();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+setInterval(() => { renderMobileLoans(); updateMobileStats(); }, 60000);
+</script>
+</body>
+</html>
