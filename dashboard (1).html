@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ToolVault — Warehouse Tool Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet"/>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+
+<style>
+/* ── Reset ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:       #0d0f10;
+  --ink2:      #181b1d;
+  --ink3:      #21262a;
+  --ink4:      #2c3237;
+  --wire:      #3a4149;
+  --muted:     #6b7885;
+  --text:      #d4dae0;
+  --bright:    #eef2f5;
+  --amber:     #f5a623;
+  --amber-dim: #7a5010;
+  --green:     #27c272;
+  --green-dim: #0f4f2c;
+  --red:       #e8403a;
+  --red-dim:   #5c1a17;
+  --blue:      #3d9cf5;
+  --blue-dim:  #153d6b;
+  --stripe:    rgba(255,255,255,0.024);
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Barlow',sans-serif;
+  background:var(--ink);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+/* Subtle grid bg */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:
+    linear-gradient(var(--stripe) 1px,transparent 1px),
+    linear-gradient(90deg,var(--stripe) 1px,transparent 1px);
+  background-size:40px 40px;
+  pointer-events:none;
+  z-index:0;
+}
+
+/* ── Header ── */
+header{
+  position:sticky;top:0;z-index:200;
+  background:var(--ink2);
+  border-bottom:2px solid var(--amber);
+  padding:0 28px;
+  height:58px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.brand{
+  display:flex;align-items:center;gap:14px;
+}
+.brand-mark{
+  width:34px;height:34px;
+  background:var(--amber);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:grid;place-items:center;
+  font-size:14px;
+  color:var(--ink);
+  font-weight:800;
+}
+.brand-name{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:22px;font-weight:800;
+  letter-spacing:1px;
+  color:var(--bright);
+  text-transform:uppercase;
+}
+.brand-name span{color:var(--amber);}
+.header-meta{
+  display:flex;align-items:center;gap:20px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;color:var(--muted);
+}
+.live-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--green);
+  animation:livepulse 2s ease-in-out infinite;
+  box-shadow:0 0 6px var(--green);
+}
+@keyframes livepulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+#clock{color:var(--amber);font-size:12px;}
+
+/* ── Layout ── */
+.shell{
+  position:relative;z-index:1;
+  max-width:1480px;margin:0 auto;
+  padding:24px 28px 60px;
+}
+
+/* ── Tabs ── */
+.nav-tabs{
+  display:flex;gap:0;
+  border-bottom:1px solid var(--wire);
+  margin-bottom:28px;
+}
+.tab-btn{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:14px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;
+  padding:10px 22px;
+  border:none;border-bottom:3px solid transparent;
+  background:transparent;color:var(--muted);
+  cursor:pointer;
+  margin-bottom:-1px;
+  transition:all .18s;
+}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--amber);border-bottom-color:var(--amber);}
+.alert-pip{
+  display:inline-block;
+  background:var(--red);color:#fff;
+  border-radius:10px;padding:1px 6px;
+  font-size:10px;font-weight:700;
+  margin-left:5px;vertical-align:middle;
+}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+
+/* ── Stat Cards ── */
+.stats{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+  gap:12px;margin-bottom:28px;
+}
+.stat{
+  background:var(--ink2);
+  border:1px solid var(--wire);
+  border-top:3px solid var(--wire);
+  padding:18px 20px;
+  position:relative;overflow:hidden;
+}
+.stat::after{
+  content:'';position:absolute;right:-10px;bottom:-10px;
+  width:70px;height:70px;border-radius:50%;
+  opacity:.06;
+}
+.stat.s-amber{border-top-color:var(--amber);}
+.stat.s-amber::after{background:var(--amber);}
+.stat.s-green{border-top-color:var(--green);}
+.stat.s-green::after{background:var(--green);}
+.stat.s-red{border-top-color:var(--red);}
+.stat.s-red::after{background:var(--red);}
+.stat.s-blue{border-top-color:var(--blue);}
+.stat.s-blue::after{background:var(--blue);}
+.stat-label{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:11px;font-weight:700;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--muted);
+  margin-bottom:10px;
+}
+.stat-val{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:44px;font-weight:800;line-height:1;
+}
+.s-amber .stat-val{color:var(--amber);}
+.s-green .stat-val{color:var(--green);}
+.s-red   .stat-val{color:var(--red);}
+.s-blue  .stat-val{color:var(--blue);}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+
+/* ── Alert Banner ── */
+.overdue-banner{
+  background:rgba(232,64,58,.12);
+  border:1px solid rgba(232,64,58,.35);
+  border-left:4px solid var(--red);
+  padding:12px 18px;
+  font-size:13px;color:var(--red);
+  margin-bottom:20px;
+  display:flex;align-items:center;gap:10px;
+}
+.overdue-banner.hidden{display:none;}
+.banner-icon{font-size:16px;}
+
+/* ── Panel (card) ── */
+.panel{
+  background:var(--ink2);
+  border:1px solid var(--wire);
+  margin-bottom:20px;
+  overflow:hidden;
+}
+.panel-head{
+  padding:14px 20px;
+  border-bottom:1px solid var(--wire);
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--ink3);
+}
+.panel-title{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:14px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.8px;
+  color:var(--bright);
+}
+.panel-title .icon{margin-right:8px;}
+
+/* ── Tables ── */
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+thead th{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:11px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;color:var(--muted);
+  padding:10px 16px;
+  background:var(--ink3);
+  border-bottom:1px solid var(--wire);
+  white-space:nowrap;text-align:left;
+}
+tbody tr{
+  border-bottom:1px solid rgba(58,65,73,.5);
+  transition:background .12s;
+}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:var(--stripe);}
+tbody td{
+  padding:11px 16px;
+  font-size:13px;
+  vertical-align:middle;
+}
+.overdue-row{
+  background:rgba(232,64,58,.07)!important;
+  border-left:3px solid var(--red);
+}
+.empty{
+  padding:40px;text-align:center;
+  color:var(--muted);font-size:13px;letter-spacing:.3px;
+}
+
+/* ── Badges ── */
+.badge{
+  display:inline-block;
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:11px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;
+  padding:3px 9px;
+}
+.b-green {background:var(--green-dim);color:var(--green);}
+.b-red   {background:var(--red-dim);  color:var(--red);}
+.b-amber {background:var(--amber-dim);color:var(--amber);}
+.b-blue  {background:var(--blue-dim); color:var(--blue);}
+.b-muted {background:var(--ink4);     color:var(--muted);}
+
+/* ── Mono UID display ── */
+.mono{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;color:var(--muted);
+  letter-spacing:.5px;
+}
+
+/* ── Search input ── */
+.srch{
+  background:var(--ink3);
+  border:1px solid var(--wire);
+  color:var(--text);
+  font-family:'Barlow',sans-serif;
+  font-size:13px;
+  padding:7px 12px;
+  outline:none;
+  min-width:180px;
+}
+.srch:focus{border-color:var(--amber);}
+select.srch{cursor:pointer;}
+
+/* ── Buttons ── */
+.btn{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:13px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;
+  padding:8px 18px;
+  border:none;cursor:pointer;
+  transition:opacity .15s;
+}
+.btn:hover{opacity:.82;}
+.btn-amber{background:var(--amber);color:var(--ink);}
+.btn-red  {background:var(--red);  color:#fff;}
+.btn-ghost{background:transparent;border:1px solid var(--wire);color:var(--muted);}
+.btn-ghost:hover{border-color:var(--amber);color:var(--amber);}
+.btn-sm{padding:4px 12px;font-size:11px;}
+
+/* ── Admin forms ── */
+.form-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:14px;padding:20px;
+}
+.fgrp{display:flex;flex-direction:column;gap:5px;}
+.fgrp label{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:11px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;color:var(--muted);
+}
+.fgrp input,.fgrp select{
+  background:var(--ink3);border:1px solid var(--wire);
+  color:var(--text);font-family:'Barlow',sans-serif;
+  font-size:13px;padding:9px 12px;outline:none;
+}
+.fgrp input:focus,.fgrp select:focus{border-color:var(--amber);}
+.form-actions{
+  padding:0 20px 20px;display:flex;gap:10px;
+}
+
+/* ── Two col admin ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+@media(max-width:860px){.two-col{grid-template-columns:1fr;}}
+
+/* ── Toast ── */
+#toast{
+  position:fixed;bottom:28px;right:28px;z-index:999;
+  background:var(--ink3);
+  border:1px solid var(--wire);
+  padding:13px 20px;
+  font-size:13px;
+  transform:translateY(70px);opacity:0;
+  transition:all .28s cubic-bezier(.4,0,.2,1);
+  max-width:300px;
+  pointer-events:none;
+}
+#toast.show{transform:translateY(0);opacity:1;}
+#toast.t-ok  {border-left:4px solid var(--green);}
+#toast.t-err {border-left:4px solid var(--red);}
+
+/* ── Section label ── */
+.sec-label{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:11px;font-weight:700;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--amber);
+  margin-bottom:14px;padding-left:2px;
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header>
+  <div class="brand">
+    <div class="brand-mark">T</div>
+    <div class="brand-name">Tool<span>Vault</span></div>
+  </div>
+  <div class="header-meta">
+    <div class="live-dot" id="dot"></div>
+    <span id="conn-status">Connecting...</span>
+    <span id="clock">--:--:--</span>
+  </div>
+</header>
+
+<div class="shell">
+
+  <!-- Overdue banner -->
+  <div class="overdue-banner hidden" id="overdue-banner">
+    <span class="banner-icon">⚠</span>
+    <span id="overdue-text"></span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="tab('dashboard',this)">Dashboard</button>
+    <button class="tab-btn" onclick="tab('loans',this)">Active Loans</button>
+    <button class="tab-btn" onclick="tab('history',this)">History</button>
+    <button class="tab-btn" onclick="tab('alerts',this)">Alerts<span class="alert-pip" id="alert-pip" style="display:none">0</span></button>
+    <button class="tab-btn" onclick="tab('admin',this)">Admin</button>
+  </div>
+
+  <!-- ═══ DASHBOARD ═══ -->
+  <div class="tab-pane active" id="pane-dashboard">
+    <div class="stats">
+      <div class="stat s-amber">
+        <div class="stat-label">Borrowed</div>
+        <div class="stat-val" id="s-borrowed">—</div>
+        <div class="stat-sub">tools out</div>
+      </div>
+      <div class="stat s-green">
+        <div class="stat-label">Available</div>
+        <div class="stat-val" id="s-avail">—</div>
+        <div class="stat-sub">ready to use</div>
+      </div>
+      <div class="stat s-blue">
+        <div class="stat-label">Total Tools</div>
+        <div class="stat-val" id="s-total">—</div>
+        <div class="stat-sub">registered</div>
+      </div>
+      <div class="stat s-red">
+        <div class="stat-label">Overdue</div>
+        <div class="stat-val" id="s-overdue">0</div>
+        <div class="stat-sub">&gt;8 hours out</div>
+      </div>
+    </div>
+
+    <!-- All Tools Overview -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title"><span class="icon">▣</span>All Tools Status</span>
+        <input class="srch" id="srch-tools" placeholder="Search tools..." oninput="filterTable('tbl-tools',this.value)"/>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Tool Name</th><th>Category</th><th>Serial No.</th>
+            <th>RFID Tag UID</th><th>Status</th><th>Held By</th><th>Since</th>
+          </tr></thead>
+          <tbody id="tbl-tools"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ACTIVE LOANS ═══ -->
+  <div class="tab-pane" id="pane-loans">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title"><span class="icon">◈</span>Currently Borrowed Tools</span>
+        <input class="srch" id="srch-loans" placeholder="Search worker or tool..." oninput="filterTable('tbl-loans',this.value)"/>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Worker</th><th>Tool</th><th>Category</th>
+            <th>Checked Out</th><th>Duration</th><th>Status</th>
+          </tr></thead>
+          <tbody id="tbl-loans"><tr><td colspan="6" class="empty">No active loans</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ HISTORY ═══ -->
+  <div class="tab-pane" id="pane-history">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title"><span class="icon">≡</span>Transaction Log</span>
+        <div style="display:flex;gap:8px">
+          <select class="srch" id="hist-filter" onchange="renderHistory()">
+            <option value="all">All Events</option>
+            <option value="CHECKOUT">Checkouts</option>
+            <option value="RETURN">Returns</option>
+          </select>
+          <input class="srch" id="srch-hist" placeholder="Search..." oninput="renderHistory()"/>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Event</th><th>Worker</th><th>Tool</th><th>Timestamp</th>
+          </tr></thead>
+          <tbody id="tbl-hist"><tr><td colspan="4" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ALERTS ═══ -->
+  <div class="tab-pane" id="pane-alerts">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title"><span class="icon">⚑</span>System Alerts</span>
+        <button class="btn btn-red btn-sm" onclick="clearAlerts()">Clear All</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Type</th><th>Details</th><th>By / Context</th><th>Timestamp</th>
+          </tr></thead>
+          <tbody id="tbl-alerts"><tr><td colspan="4" class="empty">No alerts</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ADMIN ═══ -->
+  <div class="tab-pane" id="pane-admin">
+
+    <div class="sec-label">Register New Worker</div>
+    <div class="panel" style="margin-bottom:24px">
+      <div class="form-grid">
+        <div class="fgrp">
+          <label>RFID Card UID <span style="color:var(--amber)">(from Serial Monitor)</span></label>
+          <input id="w-uid" placeholder="e.g. A1B2C3D4" oninput="this.value=this.value.toUpperCase()"/>
+        </div>
+        <div class="fgrp"><label>Full Name</label><input id="w-name" placeholder="e.g. Rahul Sharma"/></div>
+        <div class="fgrp"><label>Employee ID</label><input id="w-empid" placeholder="e.g. EMP004"/></div>
+        <div class="fgrp"><label>Department</label><input id="w-dept" placeholder="e.g. Maintenance"/></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-amber" onclick="registerWorker()">Register Worker</button>
+      </div>
+    </div>
+
+    <div class="sec-label">Register New Tool</div>
+    <div class="panel" style="margin-bottom:24px">
+      <div class="form-grid">
+        <div class="fgrp">
+          <label>RFID Tag UID <span style="color:var(--amber)">(from Serial Monitor)</span></label>
+          <input id="t-uid" placeholder="e.g. T1U2V3W4" oninput="this.value=this.value.toUpperCase()"/>
+        </div>
+        <div class="fgrp"><label>Tool Name</label><input id="t-name" placeholder="e.g. Cordless Drill"/></div>
+        <div class="fgrp">
+          <label>Category</label>
+          <select id="t-cat">
+            <option>Power Tools</option><option>Hand Tools</option>
+            <option>Measurement</option><option>Electrical</option>
+            <option>Safety Equipment</option><option>Pneumatic</option><option>Other</option>
+          </select>
+        </div>
+        <div class="fgrp"><label>Serial Number</label><input id="t-serial" placeholder="e.g. DRL-002"/></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-amber" onclick="registerTool()">Register Tool</button>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <div class="sec-label">Registered Workers</div>
+        <div class="panel">
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Emp ID</th><th>Dept</th><th></th></tr></thead>
+              <tbody id="tbl-workers"><tr><td colspan="4" class="empty">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="sec-label">Registered Tools</div>
+        <div class="panel">
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Category</th><th>S/N</th><th></th></tr></thead>
+              <tbody id="tbl-reg-tools"><tr><td colspan="4" class="empty">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /shell -->
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  ★  PASTE YOUR FIREBASE CONFIG HERE  ★
+// ════════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            "YOUR_WEB_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};
+// ════════════════════════════════════════════════════════
+
+firebase.initializeApp(firebaseConfig);
+const db   = firebase.database();
+const auth = firebase.auth();
+
+const OVERDUE_HOURS = 8;
+
+// ── Data store ──
+let allTools   = {};
+let allWorkers = {};
+let allLoans   = {};
+let allHistory = {};
+let allAlerts  = {};
+
+// ── Clock ──
+setInterval(() => {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-IN', {hour12:false});
+}, 1000);
+
+// ── Auth ──
+auth.signInAnonymously().catch(e => toast('Auth error: '+e.message,'err'));
+
+// ── Realtime listeners ──
+db.ref('/tools').on('value', s => {
+  allTools = s.val() || {};
+  renderTools(); renderLoans();
+  updateStats();
+});
+db.ref('/workers').on('value', s => {
+  allWorkers = s.val() || {};
+  renderAdminWorkers(); renderLoans();
+});
+db.ref('/activeLoans').on('value', s => {
+  allLoans = s.val() || {};
+  renderLoans(); updateStats();
+  document.getElementById('conn-status').textContent =
+    'Live · '+new Date().toLocaleTimeString('en-IN',{hour12:false});
+});
+db.ref('/history').on('value', s => {
+  allHistory = s.val() || {};
+  renderHistory();
+});
+db.ref('/alerts').on('value', s => {
+  allAlerts = s.val() || {};
+  renderAlerts();
+});
+
+// ── Tab navigation ──
+function tab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('pane-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Duration helper ──
+function duration(since) {
+  if (!since || since === '—') return '—';
+  try {
+    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,
+                    Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const parts = since.match(/(\d+)-(\w+)-(\d+) (\d+):(\d+):(\d+)/);
+    if (!parts) return since;
+    const d = new Date(+parts[3], months[parts[2]], +parts[1], +parts[4], +parts[5], +parts[6]);
+    const diff = Math.floor((Date.now() - d) / 60000);
+    if (diff < 60)   return diff + 'm';
+    if (diff < 1440) return Math.floor(diff/60) + 'h ' + (diff%60) + 'm';
+    return Math.floor(diff/1440) + 'd ' + Math.floor((diff%1440)/60) + 'h';
+  } catch { return '—'; }
+}
+
+function isOverdue(since) {
+  if (!since) return false;
+  try {
+    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,
+                    Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const parts = since.match(/(\d+)-(\w+)-(\d+) (\d+):(\d+):(\d+)/);
+    if (!parts) return false;
+    const d = new Date(+parts[3], months[parts[2]], +parts[1], +parts[4], +parts[5], +parts[6]);
+    return (Date.now() - d) / 3600000 > OVERDUE_HOURS;
+  } catch { return false; }
+}
+
+// ── Stats ──
+function updateStats() {
+  const tArr = Object.values(allTools);
+  const borrowed  = tArr.filter(t => t.status === 'borrowed').length;
+  const available = tArr.filter(t => t.status !== 'borrowed').length;
+
+  let overdue = 0;
+  for (const wLoans of Object.values(allLoans))
+    for (const loan of Object.values(wLoans))
+      if (isOverdue(loan.checkedOut)) overdue++;
+
+  document.getElementById('s-borrowed').textContent = borrowed;
+  document.getElementById('s-avail').textContent    = available;
+  document.getElementById('s-total').textContent    = tArr.length;
+  document.getElementById('s-overdue').textContent  = overdue;
+
+  const banner = document.getElementById('overdue-banner');
+  if (overdue > 0) {
+    banner.classList.remove('hidden');
+    document.getElementById('overdue-text').textContent =
+      overdue + ' tool(s) have been out for more than ' + OVERDUE_HOURS + ' hours — follow up required.';
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+
+// ── Render tools table ──
+function renderTools() {
+  let rows = '';
+  for (const [uid, t] of Object.entries(allTools)) {
+    const borrowed = t.status === 'borrowed';
+    const who = borrowed ? (allWorkers[t.borrowedBy]?.name || t.borrowedBy || '—') : '—';
+    rows += `<tr>
+      <td><strong>${esc(t.name||uid)}</strong></td>
+      <td><span class="badge b-blue">${esc(t.category||'—')}</span></td>
+      <td class="mono">${esc(t.serialNumber||'—')}</td>
+      <td class="mono">${uid}</td>
+      <td>${borrowed
+        ? '<span class="badge b-amber">Borrowed</span>'
+        : '<span class="badge b-green">Available</span>'}</td>
+      <td>${esc(who)}</td>
+      <td style="color:var(--muted);font-size:12px">${esc(t.borrowedAt||'—')}</td>
+    </tr>`;
+  }
+  document.getElementById('tbl-tools').innerHTML =
+    rows || '<tr><td colspan="7" class="empty">No tools registered yet</td></tr>';
+}
+
+// ── Render active loans ──
+function renderLoans() {
+  let rows = '';
+  for (const [wUID, wLoans] of Object.entries(allLoans)) {
+    for (const [tUID, loan] of Object.entries(wLoans)) {
+      const od  = isOverdue(loan.checkedOut);
+      const dur = duration(loan.checkedOut);
+      const cat = allTools[tUID]?.category || '—';
+      rows += `<tr class="${od ? 'overdue-row' : ''}">
+        <td><strong>${esc(loan.workerName||wUID)}</strong></td>
+        <td>${esc(loan.toolName||tUID)}</td>
+        <td><span class="badge b-blue">${esc(cat)}</span></td>
+        <td style="font-size:12px">${esc(loan.checkedOut||'—')}</td>
+        <td><span class="mono" style="color:${od?'var(--red)':'var(--amber)'}">${dur}</span></td>
+        <td>${od
+          ? '<span class="badge b-red">⚑ OVERDUE</span>'
+          : '<span class="badge b-amber">Out</span>'}</td>
+      </tr>`;
+    }
+  }
+  document.getElementById('tbl-loans').innerHTML =
+    rows || '<tr><td colspan="6" class="empty">✓ No tools currently borrowed</td></tr>';
+}
+
+// ── Render history ──
+function renderHistory() {
+  const filter = document.getElementById('hist-filter')?.value || 'all';
+  const q      = (document.getElementById('srch-hist')?.value || '').toLowerCase();
+  const entries = Object.entries(allHistory).sort(([a],[b]) => b.localeCompare(a));
+  let rows = '';
+  for (const [, ev] of entries) {
+    if (filter !== 'all' && ev.type !== filter) continue;
+    if (q && !JSON.stringify(ev).toLowerCase().includes(q)) continue;
+    const out = ev.type === 'CHECKOUT';
+    rows += `<tr>
+      <td>${out
+        ? '<span class="badge b-amber">↑ Checkout</span>'
+        : '<span class="badge b-green">↓ Return</span>'}</td>
+      <td>${esc(ev.workerName||ev.workerUID||'—')}</td>
+      <td>${esc(ev.toolName||ev.toolUID||'—')}</td>
+      <td style="font-size:12px;color:var(--muted)">${esc(ev.timestamp||'—')}</td>
+    </tr>`;
+  }
+  document.getElementById('tbl-hist').innerHTML =
+    rows || '<tr><td colspan="4" class="empty">No history yet</td></tr>';
+}
+
+// ── Render alerts ──
+function renderAlerts() {
+  const entries = Object.entries(allAlerts).sort(([a],[b]) => b.localeCompare(a));
+  const pip = document.getElementById('alert-pip');
+  pip.textContent = entries.length;
+  pip.style.display = entries.length ? 'inline' : 'none';
+
+  let rows = '';
+  for (const [, al] of entries) {
+    let badge = '', detail = '';
+    if (al.type === 'UNKNOWN_ID') {
+      badge  = '<span class="badge b-amber">Unknown ID</span>';
+      detail = 'UID: <span class="mono">'+esc(al.uid)+'</span>';
+    } else if (al.type === 'UNKNOWN_TOOL') {
+      badge  = '<span class="badge b-amber">Unknown Tool</span>';
+      detail = 'Tag: <span class="mono">'+esc(al.uid)+'</span>';
+    } else if (al.type === 'CONFLICT') {
+      badge  = '<span class="badge b-red">Conflict</span>';
+      detail = '"'+esc(al.toolName)+'" already held by '+esc(al.currentlyWithName);
+    } else {
+      badge  = '<span class="badge b-muted">'+esc(al.type)+'</span>';
+      detail = '—';
+    }
+    rows += `<tr>
+      <td>${badge}</td>
+      <td style="font-size:12px">${detail}</td>
+      <td>${esc(al.workerName||al.scannedBy||al.attemptedByName||'—')}</td>
+      <td style="font-size:12px;color:var(--muted)">${esc(al.timestamp||'—')}</td>
+    </tr>`;
+  }
+  document.getElementById('tbl-alerts').innerHTML =
+    rows || '<tr><td colspan="4" class="empty">✓ No alerts</td></tr>';
+}
+
+// ── Admin: workers list ──
+function renderAdminWorkers() {
+  let rows = '';
+  for (const [uid, w] of Object.entries(allWorkers)) {
+    rows += `<tr>
+      <td>${esc(w.name)}</td>
+      <td class="mono" style="font-size:11px">${esc(w.employeeId||'—')}</td>
+      <td>${esc(w.department||'—')}</td>
+      <td><button class="btn btn-red btn-sm" onclick="delWorker('${uid}')">Del</button></td>
+    </tr>`;
+  }
+  document.getElementById('tbl-workers').innerHTML =
+    rows || '<tr><td colspan="4" class="empty">No workers registered</td></tr>';
+
+  // Also refresh tool list
+  let trows = '';
+  for (const [uid, t] of Object.entries(allTools)) {
+    trows += `<tr>
+      <td>${esc(t.name)}</td>
+      <td><span class="badge b-blue" style="font-size:10px">${esc(t.category||'—')}</span></td>
+      <td class="mono" style="font-size:11px">${esc(t.serialNumber||'—')}</td>
+      <td><button class="btn btn-red btn-sm" onclick="delTool('${uid}')">Del</button></td>
+    </tr>`;
+  }
+  document.getElementById('tbl-reg-tools').innerHTML =
+    trows || '<tr><td colspan="4" class="empty">No tools registered</td></tr>';
+}
+
+// ── Admin actions ──
+function registerWorker() {
+  const uid  = val('w-uid').toUpperCase();
+  const name = val('w-name');
+  const emp  = val('w-empid');
+  const dept = val('w-dept');
+  if (!uid || !name) return toast('UID and Name required','err');
+  db.ref('/workers/'+uid).set({name, employeeId:emp, department:dept,
+    registeredAt: new Date().toLocaleString('en-IN')})
+    .then(() => { toast('Worker registered: '+name,'ok'); clearInputs(['w-uid','w-name','w-empid','w-dept']); })
+    .catch(e => toast('Error: '+e.message,'err'));
+}
+
+function registerTool() {
+  const uid    = val('t-uid').toUpperCase();
+  const name   = val('t-name');
+  const cat    = val('t-cat');
+  const serial = val('t-serial');
+  if (!uid || !name) return toast('UID and Name required','err');
+  db.ref('/tools/'+uid).set({name, category:cat, serialNumber:serial,
+    status:'available', borrowedBy:'', borrowedAt:'', borrowedEpoch:0,
+    registeredAt: new Date().toLocaleString('en-IN')})
+    .then(() => { toast('Tool registered: '+name,'ok'); clearInputs(['t-uid','t-name','t-serial']); })
+    .catch(e => toast('Error: '+e.message,'err'));
+}
+
+function delWorker(uid) {
+  if (!confirm('Delete worker with UID '+uid+'?')) return;
+  db.ref('/workers/'+uid).remove()
+    .then(() => toast('Worker removed','ok'))
+    .catch(e => toast('Error: '+e.message,'err'));
+}
+
+function delTool(uid) {
+  if (!confirm('Delete tool with UID '+uid+'?')) return;
+  db.ref('/tools/'+uid).remove()
+    .then(() => toast('Tool removed','ok'))
+    .catch(e => toast('Error: '+e.message,'err'));
+}
+
+function clearAlerts() {
+  if (!confirm('Clear all alerts?')) return;
+  db.ref('/alerts').remove()
+    .then(() => toast('Alerts cleared','ok'))
+    .catch(e => toast('Error: '+e.message,'err'));
+}
+
+// ── Table filter ──
+function filterTable(id, q) {
+  document.querySelectorAll('#'+id+' tr').forEach(r => {
+    r.style.display = r.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+
+// ── Helpers ──
+function val(id)          { return document.getElementById(id)?.value.trim() || ''; }
+function clearInputs(ids) { ids.forEach(id => { const el=document.getElementById(id); if(el) el.value=''; }); }
+function esc(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show t-'+type;
+  clearTimeout(t._to);
+  t._to = setTimeout(() => t.className = '', 3200);
+}
+
+// Refresh durations every 60s
+setInterval(() => { renderLoans(); updateStats(); }, 60000);
+</script>
+</body>
+</html>
